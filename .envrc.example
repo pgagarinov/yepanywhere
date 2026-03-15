@@ -1,0 +1,15 @@
+# Host binding: 0.0.0.0 for all interfaces, 127.0.0.1 for localhost only
+export HOST=0.0.0.0
+export CLI_HOST_OVERRIDE=true
+
+# Server port (maintenance=PORT+1, vite=PORT+2)
+export PORT=4000
+
+# Allow connections from any host (use specific hostnames in production)
+export ALLOWED_HOSTS=*
+
+# Claude Code config directory (for separate profiles)
+# export CLAUDE_CONFIG_DIR=/Users/you/.claude
+
+# Data directory profile (creates ~/.yep-anywhere-{profile}/)
+export YEP_ANYWHERE_PROFILE=dev

@@ -37,6 +37,20 @@ Individual overrides (rarely needed):
 - `MAINTENANCE_PORT` - Override maintenance port (set to 0 to disable)
 - `VITE_PORT` - Override vite dev port
 
+### Network Binding
+
+By default, the server binds to `127.0.0.1` (localhost only). To bind to all interfaces:
+
+```bash
+HOST=0.0.0.0 CLI_HOST_OVERRIDE=true pnpm dev
+```
+
+Or use a `.envrc` file (see `.envrc.example`). When `CLI_HOST_OVERRIDE=true` is set with a non-localhost `HOST`, the server binds directly to that address — no intermediate localhost binding.
+
+- `HOST` - Interface to bind to (default: `127.0.0.1`)
+- `CLI_HOST_OVERRIDE` - Set to `true` to use `HOST` as a CLI-level override (prevents UI from changing the binding)
+- `ALLOWED_HOSTS` - Comma-separated allowed Host headers, or `*` for any (required when binding to non-localhost)
+
 ## Data Directory & Profiles
 
 Server state is stored in a data directory (default: `~/.yep-anywhere/`). This includes:

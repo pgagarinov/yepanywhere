@@ -911,19 +911,27 @@ async function startServer() {
   networkBindingCallbackHolder.onLocalhostPortChange = onLocalhostPortChange;
   networkBindingCallbackHolder.onNetworkBindingChange = onNetworkBindingChange;
 
-  // Create the main localhost server
-  const expectedServerUrl = `${serverProtocol}://127.0.0.1:${effectivePort}`;
+  // Determine initial bind host: if CLI overrides to a non-localhost address,
+  // bind directly to that host instead of the two-step localhost→rebind dance.
+  const cliWantsNetworkBind =
+    config.cliHostOverride &&
+    config.host !== "127.0.0.1" &&
+    config.host !== "localhost";
+  const initialBindHost = cliWantsNetworkBind ? config.host : "127.0.0.1";
+
+  // Create the main server
+  const expectedServerUrl = `${serverProtocol}://${initialBindHost}:${effectivePort}`;
   console.log(`[Server] Starting on ${expectedServerUrl}`);
   localhostServer = createServer(
     effectivePort,
-    "127.0.0.1",
+    initialBindHost,
     (info) => {
       // Write port to file if requested (for test harnesses)
       if (config.portFile) {
         fs.writeFileSync(config.portFile, String(info.port));
       }
 
-      const serverUrl = `${serverProtocol}://127.0.0.1:${info.port}`;
+      const serverUrl = `${serverProtocol}://${initialBindHost}:${info.port}`;
       console.log(`Server URL: ${serverUrl}`);
       console.log(`Server running at ${serverUrl}`);
       console.log(`Projects dir: ${config.claudeProjectsDir}`);
@@ -973,6 +981,14 @@ async function startServer() {
     { fatalOnError: true },
   );
 
+  // If we bound directly to 0.0.0.0 or ::, track that state
+  if (
+    cliWantsNetworkBind &&
+    (config.host === "0.0.0.0" || config.host === "::")
+  ) {
+    boundToAllInterfaces = true;
+  }
+
   // Start network socket if enabled in saved settings (and not CLI-overridden)
   const networkConfig = networkBindingService.getNetworkConfig();
   if (
@@ -987,12 +1003,13 @@ async function startServer() {
     });
   }
 
-  // If CLI host override was specified (not localhost), also bind to that interface
-  // This handles the case where user runs `yepanywhere --host 0.0.0.0`
+  // If CLI host override was specified (not localhost) and we didn't already
+  // bind directly to it above, bind to that interface now
   if (
     config.cliHostOverride &&
     config.host !== "127.0.0.1" &&
-    config.host !== "localhost"
+    config.host !== "localhost" &&
+    !cliWantsNetworkBind
   ) {
     await onNetworkBindingChange({ host: config.host, port: effectivePort });
   }
