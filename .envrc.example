@@ -13,3 +13,9 @@ export ALLOWED_HOSTS=*
 
 # Data directory profile (creates ~/.yep-anywhere-{profile}/)
 export YEP_ANYWHERE_PROFILE=dev
+
+# Restrict available providers (comma-separated: claude, claude-ollama, codex, codex-oss, gemini, gemini-acp, opencode)
+# export ENABLED_PROVIDERS=claude
+
+# Disable voice input button
+# export VOICE_INPUT=false
