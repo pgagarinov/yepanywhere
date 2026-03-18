@@ -258,11 +258,16 @@ function extractContextUsageFromSDKMessages(
   resolveContextWindow?: (
     model: string | undefined,
     provider?: ProviderName,
-  ) => number,
+  ) => number | undefined,
 ): ContextUsage | undefined {
   const contextWindowSize = resolveContextWindow
     ? resolveContextWindow(model, provider)
     : getModelContextWindow(model, provider);
+
+  // No context window known yet (e.g. Claude before first SDK response) — skip
+  if (!contextWindowSize) {
+    return undefined;
+  }
 
   const isCodexProvider = provider === "codex" || provider === "codex-oss";
 
@@ -724,16 +729,30 @@ export function createSessionsRoutes(deps: SessionsDeps): Hono {
     // Keep persisted rendering in lockstep with stream augmentation behavior.
     await augmentPersistedSessionMessages(session.messages);
 
-    // Override context usage with SDK-reported context window from live process
-    // The reader uses hardcoded defaults; the process captures the real value at runtime
+    // Override context usage with SDK-reported context window from live process.
+    // The reader may return undefined for Claude (no static context window) —
+    // in that case, recompute from SDK messages using the process's real context window.
     let { contextUsage } = session;
-    if (process?.contextWindow && contextUsage) {
+    if (process?.contextWindow) {
       const cw = process.contextWindow;
-      contextUsage = {
-        ...contextUsage,
-        percentage: Math.round((contextUsage.inputTokens / cw) * 100),
-        contextWindow: cw,
-      };
+      if (contextUsage) {
+        // Reader produced usage but with wrong context window — recalculate percentage
+        contextUsage = {
+          ...contextUsage,
+          percentage: Math.round((contextUsage.inputTokens / cw) * 100),
+          contextWindow: cw,
+        };
+      } else {
+        // Reader returned no usage (e.g. Claude with no static context window) —
+        // compute from live SDK messages
+        const sdkMessages = process.getMessageHistory();
+        contextUsage = extractContextUsageFromSDKMessages(
+          sdkMessages,
+          process.resolvedModel,
+          process.provider,
+          () => cw,
+        );
+      }
       // Cache for future reads without a live process
       deps.modelInfoService?.recordContextWindow(
         process.resolvedModel ?? session.model ?? "",

@@ -210,10 +210,11 @@ export function useStreamingContent(
                   ? modelContextWindow
                   : model
                     ? getModelContextWindow(model)
-                    : (defaultContextWindowSize ??
-                      getModelContextWindow(undefined));
-              const percentage = (inputTokens / contextWindow) * 100;
-              onAgentContextUsage(streamAgentId, { inputTokens, percentage });
+                    : (defaultContextWindowSize ?? undefined);
+              if (contextWindow) {
+                const percentage = (inputTokens / contextWindow) * 100;
+                onAgentContextUsage(streamAgentId, { inputTokens, percentage });
+              }
             }
           }
         }

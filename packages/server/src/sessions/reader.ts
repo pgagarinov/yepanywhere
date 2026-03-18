@@ -40,7 +40,7 @@ export interface ClaudeSessionReaderOptions {
   getContextWindow?: (
     model: string | undefined,
     provider?: ProviderName,
-  ) => number;
+  ) => number | undefined;
 }
 
 /** @deprecated Use ClaudeSessionReaderOptions */
@@ -162,7 +162,7 @@ export class ClaudeSessionReader implements ISessionReader {
   private resolveContextWindow: (
     model: string | undefined,
     provider?: ProviderName,
-  ) => number;
+  ) => number | undefined;
 
   constructor(options: ClaudeSessionReaderOptions) {
     this.sessionDir = options.sessionDir;
@@ -620,6 +620,11 @@ export class ClaudeSessionReader implements ISessionReader {
     provider?: ProviderName,
   ): ContextUsage | undefined {
     const contextWindowSize = this.resolveContextWindow(model, provider);
+
+    // No context window known yet (e.g. Claude before first SDK response) — skip
+    if (!contextWindowSize) {
+      return undefined;
+    }
 
     // Compute token overhead from compaction metadata.
     // After compaction, the API reports fewer input_tokens because old messages are

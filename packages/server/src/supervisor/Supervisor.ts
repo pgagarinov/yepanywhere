@@ -7,7 +7,11 @@ import {
   type ThinkingConfig,
   type UrlProjectId,
 } from "@yep-anywhere/shared";
-import type { AgentActivity, PendingInputType } from "@yep-anywhere/shared";
+import type {
+  AgentActivity,
+  ContextUsage,
+  PendingInputType,
+} from "@yep-anywhere/shared";
 import { getLogger } from "../logging/logger.js";
 import { getProvider } from "../sdk/providers/index.js";
 import type { AgentProvider } from "../sdk/providers/types.js";
@@ -15,6 +19,7 @@ import type {
   ClaudeSDK,
   PermissionMode,
   RealClaudeSDKInterface,
+  SDKMessage,
   UserMessage,
 } from "../sdk/types.js";
 import type {
@@ -42,6 +47,42 @@ import {
   type SessionSummary,
   encodeProjectId,
 } from "./types.js";
+
+/**
+ * Extract context usage from in-memory SDK messages when the reader can't
+ * (e.g. Claude models with no static context window). Finds the last assistant
+ * message with usage data and computes percentage from the given context window.
+ */
+function extractContextUsageFromProcessMessages(
+  sdkMessages: SDKMessage[],
+  contextWindow: number,
+): ContextUsage | undefined {
+  for (let i = sdkMessages.length - 1; i >= 0; i--) {
+    const msg = sdkMessages[i];
+    if (msg?.type !== "assistant") continue;
+    const message = msg.message as Record<string, unknown> | undefined;
+    const usage = message?.usage as
+      | {
+          input_tokens?: number;
+          cache_read_input_tokens?: number;
+          cache_creation_input_tokens?: number;
+          output_tokens?: number;
+        }
+      | undefined;
+    if (!usage) continue;
+    const inputTokens =
+      (usage.input_tokens ?? 0) +
+      (usage.cache_read_input_tokens ?? 0) +
+      (usage.cache_creation_input_tokens ?? 0);
+    if (inputTokens === 0) continue;
+    return {
+      inputTokens,
+      percentage: Math.round((inputTokens / contextWindow) * 100),
+      contextWindow,
+    };
+  }
+  return undefined;
+}
 
 /** Maximum number of terminated processes to retain */
 const MAX_TERMINATED_PROCESSES = 50;
@@ -1467,6 +1508,19 @@ export class Supervisor {
     const summary = await this.onSessionSummary(sessionId, projectId);
     if (!summary) return;
 
+    // If reader returned no contextUsage (e.g. Claude with no static context window)
+    // but the live process has a real context window from the SDK, use it to
+    // recompute contextUsage from the process's in-memory SDK messages.
+    let { contextUsage } = summary;
+    const process = this.getProcessForSession(sessionId);
+    if (process?.contextWindow && !contextUsage) {
+      const sdkMessages = process.getMessageHistory();
+      contextUsage = extractContextUsageFromProcessMessages(
+        sdkMessages,
+        process.contextWindow,
+      );
+    }
+
     const event: SessionUpdatedEvent = {
       type: "session-updated",
       sessionId,
@@ -1474,7 +1528,7 @@ export class Supervisor {
       title: summary.title,
       messageCount: summary.messageCount,
       updatedAt: summary.updatedAt,
-      contextUsage: summary.contextUsage,
+      contextUsage,
       model: summary.model,
       timestamp: new Date().toISOString(),
     };

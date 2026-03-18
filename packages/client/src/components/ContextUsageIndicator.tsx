@@ -73,7 +73,16 @@ export function ContextUsageIndicator({
         />
       </svg>
       {showLabel && (
-        <span className="context-usage-label">{clampedPercentage}%</span>
+        <span className="context-usage-label">
+          {clampedPercentage}%
+          {usage.contextWindow && (
+            <span className="context-usage-tokens">
+              {" "}
+              {formatTokens(usage.inputTokens)}/
+              {formatTokens(usage.contextWindow)}
+            </span>
+          )}
+        </span>
       )}
     </span>
   );
@@ -84,10 +93,12 @@ export function ContextUsageIndicator({
  */
 function formatTokens(tokens: number): string {
   if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(1)}M`;
+    const val = tokens / 1_000_000;
+    return `${Number.isInteger(val) ? val : val.toFixed(1)}M`;
   }
   if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1)}K`;
+    const val = tokens / 1_000;
+    return `${Number.isInteger(val) ? val : val.toFixed(1)}K`;
   }
   return tokens.toString();
 }

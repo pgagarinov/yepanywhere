@@ -454,6 +454,7 @@ export class GeminiSessionReader implements ISessionReader {
     model: string | undefined,
   ): ContextUsage | undefined {
     const contextWindowSize = getModelContextWindow(model);
+    if (!contextWindowSize) return undefined;
 
     // Find last assistant message with token info
     for (let i = messages.length - 1; i >= 0; i--) {

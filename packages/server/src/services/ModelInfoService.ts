@@ -23,7 +23,10 @@ export class ModelInfoService {
    * Get context window for a model (sync).
    * Checks cache first, falls back to shared heuristic.
    */
-  getContextWindow(model: string | undefined, provider?: ProviderName): number {
+  getContextWindow(
+    model: string | undefined,
+    provider?: ProviderName,
+  ): number | undefined {
     if (model && provider) {
       const cached = this.contextWindows.get(`${provider}:${model}`);
       if (cached !== undefined) return cached;

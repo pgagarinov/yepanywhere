@@ -506,6 +506,7 @@ export class CodexSessionReader implements ISessionReader {
             info.model_context_window && info.model_context_window > 0
               ? info.model_context_window
               : getModelContextWindow(model, provider);
+          if (!contextWindow) continue;
           const percentage = Math.min(
             100,
             Math.round((inputTokens / contextWindow) * 100),

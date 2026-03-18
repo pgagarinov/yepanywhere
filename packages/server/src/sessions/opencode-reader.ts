@@ -482,6 +482,7 @@ export class OpenCodeSessionReader implements ISessionReader {
     model: string | undefined,
   ): Promise<ContextUsage | undefined> {
     const contextWindowSize = getModelContextWindow(model);
+    if (!contextWindowSize) return undefined;
     const messageDir = join(this.storageDir, "message", sessionId);
 
     try {
