@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
@@ -9,7 +9,10 @@ import { useRemoteBasePath } from "../hooks/useRemoteBasePath";
 import { useNavigationLayout } from "../layouts";
 
 export function ProjectsPage() {
-  const { projects, loading, error, refetch } = useProjects();
+  const [showArchived, setShowArchived] = useState(false);
+  const { projects, loading, error, refetch } = useProjects({
+    includeArchived: showArchived,
+  });
   const { needsAttention, active } = useInboxContext();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newProjectPath, setNewProjectPath] = useState("");
@@ -57,6 +60,15 @@ export function ProjectsPage() {
       return bTime - aTime;
     });
   }, [projects, attentionByProject]);
+
+  const handleToggleArchive = useCallback(
+    async (projectId: string, currentlyArchived: boolean) => {
+      await api.updateProjectMetadata(projectId, {
+        archived: !currentlyArchived,
+      });
+    },
+    [],
+  );
 
   const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,27 +120,37 @@ export function ProjectsPage() {
             {/* Toolbar with Add Project button */}
             <div className="inbox-toolbar">
               {!showAddForm ? (
-                <button
-                  type="button"
-                  className="inbox-refresh-button"
-                  onClick={() => setShowAddForm(true)}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                <>
+                  <button
+                    type="button"
+                    className="inbox-refresh-button"
+                    onClick={() => setShowAddForm(true)}
                   >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Add Project
-                </button>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Add Project
+                  </button>
+                  <label className="inbox-toolbar__toggle">
+                    <input
+                      type="checkbox"
+                      checked={showArchived}
+                      onChange={(e) => setShowArchived(e.target.checked)}
+                    />
+                    Show Archived
+                  </label>
+                </>
               ) : (
                 <form onSubmit={handleAddProject} className="add-project-form">
                   <input
@@ -196,6 +218,13 @@ export function ProjectsPage() {
                     }
                     thinkingCount={thinkingByProject.get(project.id) ?? 0}
                     basePath={basePath}
+                    isArchived={project.isArchived}
+                    onToggleArchive={() =>
+                      handleToggleArchive(
+                        project.id,
+                        project.isArchived ?? false,
+                      )
+                    }
                   />
                 ))}
               </ul>

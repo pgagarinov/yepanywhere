@@ -23,6 +23,7 @@ import type {
   Project,
   SessionSummary,
 } from "../supervisor/types.js";
+import type { EventBus } from "../watcher/EventBus.js";
 import { buildProviderProjectCatalog } from "./provider-catalog.js";
 
 export interface ProjectsDeps {
@@ -47,6 +48,8 @@ export interface ProjectsDeps {
   geminiSessionsDir?: string;
   /** Optional shared Gemini reader factory for cross-provider session lookups */
   geminiReaderFactory?: (projectPath: string) => GeminiSessionReader;
+  /** EventBus for emitting project metadata change events */
+  eventBus?: EventBus;
 }
 
 interface ProjectActivityCounts {
@@ -224,21 +227,29 @@ export function createProjectsRoutes(deps: ProjectsDeps): Hono {
 
   // GET /api/projects - List all projects
   routes.get("/", async (c) => {
+    const includeArchived = c.req.query("includeArchived") === "true";
     const rawProjects = await deps.scanner.listProjects();
     const activityCounts = await getProjectActivityCounts(
       deps.supervisor,
       deps.externalTracker,
     );
 
-    // Enrich projects with active counts (all keyed by UrlProjectId now)
-    const projects = rawProjects.map((project) => {
+    // Enrich projects with active counts and archived status
+    let projects = rawProjects.map((project) => {
       const counts = activityCounts.get(project.id);
+      const metadata = deps.projectMetadataService?.getMetadata(project.id);
       return {
         ...project,
         activeOwnedCount: counts?.activeOwnedCount ?? 0,
         activeExternalCount: counts?.activeExternalCount ?? 0,
+        isArchived: metadata?.isArchived ?? false,
       };
     });
+
+    // Filter out archived projects unless explicitly requested
+    if (!includeArchived) {
+      projects = projects.filter((p) => !p.isArchived);
+    }
 
     // Sort by lastActivity descending (most recent first), nulls last
     projects.sort((a, b) => {
@@ -318,6 +329,89 @@ export function createProjectsRoutes(deps: ProjectsDeps): Hono {
     }
 
     return c.json({ project });
+  });
+
+  // Helper to list sessions for a project (used by PUT metadata and GET sessions)
+  async function listProjectSessions(
+    projectId: string,
+  ): Promise<SessionSummary[]> {
+    const project = await deps.scanner.getOrCreateProject(projectId);
+    if (!project) return [];
+
+    const reader = deps.readerFactory(project);
+    let sessions: SessionSummary[];
+    if (deps.sessionIndexService) {
+      sessions = await deps.sessionIndexService.getSessionsWithCache(
+        project.sessionDir,
+        project.id,
+        reader,
+      );
+      if (project.provider === "claude" && project.mergedSessionDirs) {
+        for (const dir of project.mergedSessionDirs) {
+          const mergedReader = new ClaudeSessionReader({ sessionDir: dir });
+          const merged = await deps.sessionIndexService.getSessionsWithCache(
+            dir,
+            project.id,
+            mergedReader,
+          );
+          sessions = [...sessions, ...merged];
+        }
+      }
+    } else {
+      sessions = await reader.listSessions(project.id);
+    }
+
+    return sessions;
+  }
+
+  // PUT /api/projects/:projectId/metadata - Update project metadata (archive/unarchive)
+  routes.put("/:projectId/metadata", async (c) => {
+    const projectId = c.req.param("projectId");
+
+    if (!isUrlProjectId(projectId)) {
+      return c.json({ error: "Invalid project ID format" }, 400);
+    }
+
+    let body: { archived?: boolean };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+
+    if (typeof body.archived !== "boolean") {
+      return c.json({ error: "archived must be a boolean" }, 400);
+    }
+
+    if (!deps.projectMetadataService) {
+      return c.json({ error: "Project metadata service not available" }, 500);
+    }
+
+    // Set archived on the project
+    await deps.projectMetadataService.setArchived(projectId, body.archived);
+
+    // Cascade: archive/unarchive all sessions in this project
+    let sessionsUpdated = 0;
+    if (deps.sessionMetadataService) {
+      const sessions = await listProjectSessions(projectId);
+      for (const session of sessions) {
+        await deps.sessionMetadataService.setArchived(
+          session.id,
+          body.archived,
+        );
+        sessionsUpdated++;
+      }
+    }
+
+    // Emit a single project-metadata-changed event (client refetches on this)
+    deps.eventBus?.emit({
+      type: "project-metadata-changed",
+      projectId,
+      archived: body.archived,
+      timestamp: new Date().toISOString(),
+    });
+
+    return c.json({ updated: true, sessionsUpdated });
   });
 
   // GET /api/projects/:projectId/sessions - List sessions

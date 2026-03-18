@@ -79,6 +79,13 @@ export interface SessionMetadataChangedEvent {
   timestamp: string;
 }
 
+export interface ProjectMetadataChangedEvent {
+  type: "project-metadata-changed";
+  projectId: string;
+  archived?: boolean;
+  timestamp: string;
+}
+
 /**
  * Event emitted when session content changes (title, messageCount, etc.).
  * This is different from session-metadata-changed which is for user-set metadata.
@@ -151,6 +158,7 @@ interface ActivityEventMap {
   "session-seen": SessionSeenEvent;
   "process-state-changed": ProcessStateEvent;
   "session-metadata-changed": SessionMetadataChangedEvent;
+  "project-metadata-changed": ProjectMetadataChangedEvent;
   // Connection events
   "browser-tab-connected": BrowserTabConnectedEvent;
   "browser-tab-disconnected": BrowserTabDisconnectedEvent;
@@ -405,6 +413,7 @@ class ActivityBus {
       "session-seen",
       "process-state-changed",
       "session-metadata-changed",
+      "project-metadata-changed",
       "browser-tab-connected",
       "browser-tab-disconnected",
       "source-change",

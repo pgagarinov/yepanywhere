@@ -13,6 +13,8 @@ export interface ProjectMetadata {
   path: string;
   /** When the project was added */
   addedAt: string;
+  /** Whether the project is archived */
+  isArchived?: boolean;
 }
 
 export interface ProjectMetadataState {
@@ -121,6 +123,24 @@ export class ProjectMetadataService {
       this.state.projects = rest;
       await this.save();
     }
+  }
+
+  /**
+   * Set the archived status for a project.
+   */
+  async setArchived(projectId: string, archived: boolean): Promise<void> {
+    const existing = this.state.projects[projectId];
+    if (existing) {
+      existing.isArchived = archived || undefined;
+    } else {
+      // Create a minimal entry for projects not yet in state
+      this.state.projects[projectId] = {
+        path: "",
+        addedAt: new Date().toISOString(),
+        isArchived: archived || undefined,
+      };
+    }
+    await this.save();
   }
 
   /**

@@ -160,4 +160,5 @@ export interface Project {
   activeOwnedCount: number;
   activeExternalCount: number;
   lastActivity: string | null;
+  isArchived?: boolean;
 }

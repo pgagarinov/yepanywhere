@@ -355,7 +355,14 @@ export const api = {
   // Provider API
   getProviders: () => fetchJSON<{ providers: ProviderInfo[] }>("/providers"),
 
-  getProjects: () => fetchJSON<{ projects: Project[] }>("/projects"),
+  getProjects: (params?: { includeArchived?: boolean }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.includeArchived) searchParams.set("includeArchived", "true");
+    const query = searchParams.toString();
+    return fetchJSON<{ projects: Project[] }>(
+      query ? `/projects?${query}` : "/projects",
+    );
+  },
 
   /**
    * Add a project by file path.
@@ -367,6 +374,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ path }),
     }),
+
+  updateProjectMetadata: (projectId: string, updates: { archived: boolean }) =>
+    fetchJSON<{ updated: boolean; sessionsUpdated: number }>(
+      `/projects/${projectId}/metadata`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      },
+    ),
 
   getProject: (projectId: string) =>
     fetchJSON<{ project: Project }>(`/projects/${projectId}`),

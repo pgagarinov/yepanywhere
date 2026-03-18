@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { shortenPath } from "../lib/text";
 import type { Project } from "../types";
@@ -11,6 +12,10 @@ interface ProjectCardProps {
   thinkingCount: number;
   /** Base path prefix for relay mode (e.g., "/remote/my-server") */
   basePath?: string;
+  /** Whether the project is archived */
+  isArchived?: boolean;
+  /** Callback to toggle archive status */
+  onToggleArchive?: () => void;
 }
 
 /**
@@ -40,8 +45,12 @@ export function ProjectCard({
   needsAttentionCount,
   thinkingCount,
   basePath = "",
+  isArchived,
+  onToggleArchive,
 }: ProjectCardProps) {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handleNewSession = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -49,8 +58,26 @@ export function ProjectCard({
     navigate(`${basePath}/new-session?projectId=${project.id}`);
   };
 
+  const handleMenuToggle = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuOpen((prev) => !prev);
+  }, []);
+
+  const handleArchiveClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMenuOpen(false);
+      onToggleArchive?.();
+    },
+    [onToggleArchive],
+  );
+
   return (
-    <li className="project-card">
+    <li
+      className={`project-card${isArchived ? " project-card--archived" : ""}`}
+    >
       <Link
         to={`${basePath}/sessions?project=${project.id}`}
         className="project-card__link"
@@ -64,27 +91,64 @@ export function ProjectCard({
             )}
             {project.name}
           </strong>
-          <button
-            type="button"
-            className="project-card__new-session"
-            onClick={handleNewSession}
-            title="New session"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          <div className="project-card__actions">
+            <button
+              type="button"
+              className="project-card__new-session"
+              onClick={handleNewSession}
+              title="New session"
             >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <div className="project-card__menu-container" ref={menuRef}>
+              <button
+                type="button"
+                className="project-card__menu-button"
+                onClick={handleMenuToggle}
+                title="More options"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="5" r="1" />
+                  <circle cx="12" cy="12" r="1" />
+                  <circle cx="12" cy="19" r="1" />
+                </svg>
+              </button>
+              {menuOpen && (
+                <div className="project-card__menu">
+                  <button
+                    type="button"
+                    className="project-card__menu-item"
+                    onClick={handleArchiveClick}
+                  >
+                    {isArchived ? "Unarchive" : "Archive"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
         <div className="project-card__meta">
           <span className="project-card__path" title={project.path}>

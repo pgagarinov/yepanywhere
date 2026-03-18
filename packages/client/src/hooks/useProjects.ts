@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { Project } from "../types";
-import { type SessionStatusEvent, useFileActivity } from "./useFileActivity";
+import {
+  type ProjectMetadataChangedEvent,
+  type SessionStatusEvent,
+  useFileActivity,
+} from "./useFileActivity";
 
 /**
  * Fetch a single project by ID.
@@ -56,18 +60,26 @@ export function useProject(projectId: string | undefined) {
 
 const REFETCH_DEBOUNCE_MS = 500;
 
-export function useProjects() {
+export function useProjects(options?: { includeArchived?: boolean }) {
+  const includeArchived = options?.includeArchived;
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFetchedRef = useRef(false);
+  const includeArchivedRef = useRef(includeArchived);
+  includeArchivedRef.current = includeArchived;
 
   const fetch = useCallback(async () => {
-    setLoading(true);
+    // Only show loading spinner on initial fetch, not on refetches
+    if (!hasFetchedRef.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      const data = await api.getProjects();
+      const data = await api.getProjects({
+        includeArchived: includeArchivedRef.current,
+      });
       setProjects(data.projects);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -93,6 +105,15 @@ export function useProjects() {
     }, REFETCH_DEBOUNCE_MS);
   }, [fetch]);
 
+  // Refetch when includeArchived changes
+  const prevIncludeArchivedRef = useRef(includeArchived);
+  useEffect(() => {
+    if (prevIncludeArchivedRef.current !== includeArchived) {
+      prevIncludeArchivedRef.current = includeArchived;
+      fetch();
+    }
+  }, [includeArchived, fetch]);
+
   // Handle session status changes - refetch to update active counts
   const handleSessionStatusChange = useCallback(
     (_event: SessionStatusEvent) => {
@@ -101,9 +122,18 @@ export function useProjects() {
     [debouncedRefetch],
   );
 
-  // Subscribe to session status changes
+  // Handle project metadata changes (archive/unarchive)
+  const handleProjectMetadataChange = useCallback(
+    (_event: ProjectMetadataChangedEvent) => {
+      debouncedRefetch();
+    },
+    [debouncedRefetch],
+  );
+
+  // Subscribe to session status and project metadata changes
   useFileActivity({
     onSessionStatusChange: handleSessionStatusChange,
+    onProjectMetadataChange: handleProjectMetadataChange,
   });
 
   // Cleanup debounce timer

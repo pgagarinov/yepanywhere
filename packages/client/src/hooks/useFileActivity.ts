@@ -3,6 +3,7 @@ import {
   type FileChangeEvent,
   type FileType,
   type ProcessStateEvent,
+  type ProjectMetadataChangedEvent,
   type SessionCreatedEvent,
   type SessionMetadataChangedEvent,
   type SessionSeenEvent,
@@ -18,6 +19,7 @@ export type {
   FileChangeType,
   FileType,
   ProcessStateEvent,
+  ProjectMetadataChangedEvent,
   SessionCreatedEvent,
   SessionMetadataChangedEvent,
   SessionSeenEvent,
@@ -42,6 +44,8 @@ interface UseFileActivityOptions {
   onProcessStateChange?: (event: ProcessStateEvent) => void;
   /** Callback when session metadata changes (title, archived, starred) */
   onSessionMetadataChange?: (event: SessionMetadataChangedEvent) => void;
+  /** Callback when project metadata changes (archived) */
+  onProjectMetadataChange?: (event: ProjectMetadataChangedEvent) => void;
   /** Callback when session content changes (auto-generated title, messageCount) */
   onSessionUpdated?: (event: SessionUpdatedEvent) => void;
   /** Callback when SSE connection is re-established after being disconnected */
@@ -63,6 +67,7 @@ export function useFileActivity(options: UseFileActivityOptions = {}) {
     onSessionSeen,
     onProcessStateChange,
     onSessionMetadataChange,
+    onProjectMetadataChange,
     onSessionUpdated,
     onReconnect,
   } = options;
@@ -85,6 +90,8 @@ export function useFileActivity(options: UseFileActivityOptions = {}) {
   onProcessStateChangeRef.current = onProcessStateChange;
   const onSessionMetadataChangeRef = useRef(onSessionMetadataChange);
   onSessionMetadataChangeRef.current = onSessionMetadataChange;
+  const onProjectMetadataChangeRef = useRef(onProjectMetadataChange);
+  onProjectMetadataChangeRef.current = onProjectMetadataChange;
   const onSessionUpdatedRef = useRef(onSessionUpdated);
   onSessionUpdatedRef.current = onSessionUpdated;
   const onReconnectRef = useRef(onReconnect);
@@ -141,6 +148,12 @@ export function useFileActivity(options: UseFileActivityOptions = {}) {
     unsubscribers.push(
       activityBus.on("session-metadata-changed", (data) => {
         onSessionMetadataChangeRef.current?.(data);
+      }),
+    );
+
+    unsubscribers.push(
+      activityBus.on("project-metadata-changed", (data) => {
+        onProjectMetadataChangeRef.current?.(data);
       }),
     );
 

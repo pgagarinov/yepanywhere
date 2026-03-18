@@ -134,6 +134,14 @@ export interface SessionMetadataChangedEvent {
   timestamp: string;
 }
 
+/** Event emitted when project metadata changes (archived status) */
+export interface ProjectMetadataChangedEvent {
+  type: "project-metadata-changed";
+  projectId: string;
+  archived?: boolean;
+  timestamp: string;
+}
+
 /** Event emitted when a session process is aborted by this server */
 export interface SessionAbortedEvent {
   type: "session-aborted";
@@ -217,6 +225,7 @@ export type BusEvent =
   | QueueRequestRemovedEvent
   | WorkerActivityEvent
   | SessionMetadataChangedEvent
+  | ProjectMetadataChangedEvent
   | SessionAbortedEvent
   | SessionUpdatedEvent
   | NetworkBindingChangedEvent

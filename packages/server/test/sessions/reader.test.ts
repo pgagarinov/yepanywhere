@@ -955,6 +955,16 @@ describe("SessionReader", () => {
   });
 
   describe("context usage with compaction", () => {
+    // Override reader with a known context window for these tests.
+    // The default getModelContextWindow returns undefined for Claude models
+    // (context window is reported by SDK at runtime), so we need to provide one.
+    beforeEach(() => {
+      reader = new SessionReader({
+        sessionDir: testDir,
+        getContextWindow: () => 200000,
+      });
+    });
+
     /** Helper to create an assistant message with usage data */
     function assistantMsg(
       uuid: string,
